@@ -69,6 +69,13 @@ public class Program
             });
         });
         builder.Services.AddHealthChecks();
+
+        // Registrar primero el DbContext de autenticación antes de configurar Identity
+        builder.Services.AddDbContext<AuthenticateContext>(options =>
+        {
+            options.UseSqlServer(builder.Configuration.GetConnectionString("Dsw2025Tpi"));
+        });
+
         builder.Services.AddIdentity<IdentityUser, IdentityRole>(options =>
         {
             options.Password = new PasswordOptions
@@ -80,10 +87,8 @@ public class Program
                .AddEntityFrameworkStores<AuthenticateContext>()
                .AddDefaultTokenProviders();
 
+        // Registrar servicios del dominio (incluye Dsw2025TpiContext)
         builder.Services.AddDomainServices(builder.Configuration);
-        builder.Services.AddDbContext<AuthenticateContext>(options => {
-            options.UseSqlServer(builder.Configuration.GetConnectionString("Dsw2025Tpi"));
-        });
         builder.Services.AddSingleton<JwtTokenService>();
         var jwtConfig = builder.Configuration.GetSection("Jwt");
         var keyText = jwtConfig["Key"] ?? throw new ArgumentNullException("JWT Key");
@@ -173,14 +178,17 @@ public class Program
 
         }
 
-        if (app.Environment.IsDevelopment())
+        // Habilitar Swagger siempre y exponer la UI en la raíz (/) para que se muestre al abrir la aplicación
+        app.UseSwagger();
+        app.UseSwaggerUI(options =>
         {
-            app.UseSwagger();
-            app.UseSwaggerUI();
-        }
+            options.RoutePrefix = string.Empty; // servir Swagger UI en /
+            options.SwaggerEndpoint("/swagger/v1/swagger.json", "Dsw2025TPI - FLJ v1");
+        });
 
         app.UseCors("AllowFrontend");
-        app.UseHttpsRedirection();
+        // Deshabilitar redirección a HTTPS para permitir acceder a Swagger en HTTP cuando no hay endpoint HTTPS configurado
+        // app.UseHttpsRedirection();
 
         app.UseAuthentication();
         app.UseAuthorization();
